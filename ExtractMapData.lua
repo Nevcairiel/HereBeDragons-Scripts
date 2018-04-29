@@ -139,6 +139,11 @@ local str = table.concat(S)
 -- uncomment to print db2 map data
 --print(str)
 
+local function MapIDSorter(a,b) return a.MapID < b.MapID end
+
+table.sort(W, MapIDSorter)
+table.sort(C, MapIDSorter)
+
 print()
 print("WorldMapData follows")
 print("-------------------------------")
