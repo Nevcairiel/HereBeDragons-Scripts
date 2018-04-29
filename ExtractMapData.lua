@@ -164,6 +164,7 @@ end
 print()
 print("Transform Data follows")
 print("-------------------------------")
+print("    local transformData = {")
 for _, k in pairs(C) do
 	if k.MapID and k.MapID ~= T[k.uiMapID][1] then
 		local w = k.Region4 - k.Region1
@@ -178,8 +179,9 @@ for _, k in pairs(C) do
 		local offsetY = T[k.uiMapID][4] - t2
 		if math.abs(offsetX) > 0.1 or math.abs(offsetY) > 0.1 then
 			--print(k.uiMapID,k.OrderIndex,k.MapID, T[k.uiMapID][1], offsetY, offsetX)
-			print(string.format("        table.insert(transforms, { instanceID = %d, newInstanceID = %d, minY = %s, maxY = %s, minX = %s, maxX = %s, offsetY = %s, offsetX = %s })",
+			print(string.format("        { %d, %d, %s, %s, %s, %s, %s, %s },",
 			                     k.MapID, T[k.uiMapID][1], ppf(k.Region0, 2), ppf(k.Region3, 2), ppf(k.Region1, 2), ppf(k.Region4, 2), ppf(offsetY, 1), ppf(offsetX, 1)))
 		end
 	end
 end
+print("    }")
