@@ -1,28 +1,31 @@
 
-local WOWDIR = "F:\\Games\\World of Warcraft Beta"
+local WOWDIR = "E:\\Games\\World of Warcraft"
 local CDN = "http://eu.patch.battle.net/wow/#eu"
+local PRODUCT = "wowt" --  "wow", "wowt", "wow_classic"
 
 local INFO = {
 	["UIMapAssignment.db2"] = {
 		table = "UIMapAssignment",
+		fileId = 1957219,
 		fields = {
 			[1] = "id",
-			[3] = "uiMapID",
-			[4] = "OrderIndex",
-			[5] = "UIMin0",
-			[6] = "UIMin1",
-			[7] = "UIMax0",
-			[8] = "UIMax1",
-			[9] = "MapID",
-			[10] = "AreaID",
-			[11] = "WMODoodadPlacementID",
-			[12] = "WMOGroupID",
-			[13] = "Region0",
-			[14] = "Region1",
-			[15] = "Region2",
-			[16] = "Region3",
-			[17] = "Region4",
-			[18] = "Region5",
+			[2] = "UIMin0",
+			[3] = "UIMin1",
+			[4] = "UIMax0",
+			[5] = "UIMax1",
+			[6] = "Region0",
+			[7] = "Region1",
+			[8] = "Region2",
+			[9] = "Region3",
+			[10] = "Region4",
+			[11] = "Region5",
+			--[12] = "id",
+			[13] = "uiMapID",
+			[14] = "OrderIndex",
+			[15] = "MapID",
+			[16] = "AreaID",
+			[17] = "WMODoodadPlacementID",
+			[18] = "WMOGroupID",
 		},
 	}
 }
@@ -38,6 +41,7 @@ local Continents = {
 	[1220] = 619, -- Broken Isles
 	[1642] = 875, -- Zandalar
 	[1643] = 876, -- Kul Tiras
+	[2364] = 1550, -- Shadowlands
 }
 
 -- uiMapID -> MapID
@@ -51,6 +55,7 @@ local ContinentUIMapIDs = {
 	[619] = 1220, -- Broken Isles
 	[875] = 1642, -- Zandalar
 	[876] = 1643, -- Kul Tiras
+	[1550] = 2364, -- Shadowlands
 }
 
 local function printerr(pattern, ...)
@@ -60,13 +65,37 @@ end
 local casc, dbc = require("casc"), require("dbc")
 
 local cdnFlag = nil
+local buildKey, cdnBase, cdnKey, version
 if WOWDIR then
-	local buildKey, cdnBase, cdnKey, version = casc.localbuild(WOWDIR .. "\\.build.info", casc.selectActiveBuild)
+	local function selectBuild(buildInfo)
+		for i=1,#buildInfo do
+			if buildInfo[i].Product == PRODUCT and buildInfo[i].Active == 1 then
+				return i
+			end
+			assert(0)
+		end
+	end
+
+	buildKey, cdnBase, cdnKey, version = casc.localbuild(WOWDIR .. "\\.build.info", selectBuild)
 	cdnFlag = false
 	printerr("Build: %s", tostring(version))
 end
-
-local handle = casc.open(WOWDIR or CDN, {locale = casc.locale.GB, verifyHashes = false, cdn = cdnFlag})
+local handle
+if WOWDIR then
+	local err
+	handle, err = casc.open({base = WOWDIR .. "\\Data", locale = casc.locale.GB, verifyHashes = false, cdn = cdnFlag, bkey = buildKey})
+	if not handle then
+		printerr("Unable to open CASC, %s", err)
+		return
+	end
+else
+	local err
+	handle = casc.open(CDN, {locale = casc.locale.GB, verifyHashes = false})
+	if not handle then
+		printerr("Unable to open CASC, %s", err)
+		return
+	end
+end
 
 local function process_row(info, ...)
 	local id = (...)
@@ -77,11 +106,10 @@ local function process_row(info, ...)
 	return id, entry
 end
 
-local function load_dbc(file, info)
-	file = "DBFilesClient/" .. file
+local function load_dbc(info)
 	local t = {}
 	_G[info.table] = t
-	local data, err = handle:readFile(file)
+	local data, err = handle:readFile(info.fileId)
 	if not data then printerr(err) end
 	local iter, d, c = dbc.rows(data, dbc.fields(data))
 	while true do
@@ -94,10 +122,10 @@ local function load_dbc(file, info)
 	end
 end
 
-for file, info in pairs(INFO) do
-	local status, error = pcall(load_dbc, file, info)
+for _file, info in pairs(INFO) do
+	local status, error = pcall(load_dbc, info)
 	if not status then
-		printerr("LOAD ERROR: %s, %s", file, error)
+		printerr("LOAD ERROR: %s, %s", _file, error)
 	end
 end
 
@@ -137,7 +165,7 @@ end
 table.insert(S, "}")
 local str = table.concat(S)
 -- uncomment to print db2 map data
---print(str)
+print(str)
 
 local function MapIDSorter(a,b) return a.MapID < b.MapID end
 
