@@ -1,7 +1,7 @@
 
 local WOWDIR = "E:\\Games\\World of Warcraft"
 local CDN = "http://eu.patch.battle.net/wow/#eu"
-local PRODUCT = "wowt" --  "wow", "wowt", "wow_classic"
+local PRODUCT = "wow_classic_beta" --  "wow", "wowt", "wow_classic"
 
 local INFO = {
 	["UIMapAssignment.db2"] = {
@@ -27,6 +27,19 @@ local INFO = {
 			[17] = "WMODoodadPlacementID",
 			[18] = "WMOGroupID",
 		},
+	},
+	["UIMap.db2"] = {
+		table = "UIMap",
+		fileId = 1957206,
+		syntax = "suuuuu.*",
+		fields = {
+			[1] = "id",
+			[2] = "name",
+			[4] = "parent",
+			[5] = "flags",
+			[6] = "system",
+			[7] = "type",
+		}
 	}
 }
 
@@ -56,6 +69,16 @@ local ContinentUIMapIDs = {
 	[875] = 1642, -- Zandalar
 	[876] = 1643, -- Kul Tiras
 	[1550] = 2364, -- Shadowlands
+	
+	-- Classic/BC
+	[1414] = 1, -- Kalimdor
+	[1415] = 0, -- EK
+	[1945] = 530, -- Outlands
+}
+
+local keys = {
+	["83a2ab72dd8ae992"] = "023cff062b19a529b9f14f9b7aaac5bb",
+	["17f07c2e3a45db3d"] = "6D3886BDB91E715AE7182D9F3A08F2C9",
 }
 
 local function printerr(pattern, ...)
@@ -83,7 +106,7 @@ end
 local handle
 if WOWDIR then
 	local err
-	handle, err = casc.open({base = WOWDIR .. "\\Data", locale = casc.locale.GB, verifyHashes = false, cdn = cdnFlag, bkey = buildKey})
+	handle, err = casc.open({base = WOWDIR .. "\\Data", locale = casc.locale.GB, verifyHashes = false, cdn = cdnFlag, bkey = buildKey, keys = keys})
 	if not handle then
 		printerr("Unable to open CASC, %s", err)
 		return
@@ -111,7 +134,7 @@ local function load_dbc(info)
 	_G[info.table] = t
 	local data, err = handle:readFile(info.fileId)
 	if not data then printerr(err) end
-	local iter, d, c = dbc.rows(data, dbc.fields(data))
+	local iter, d, c = dbc.rows(data, info.syntax or "*?", true)
 	while true do
 		local id, entry = process_row(info, iter(d, c))
 		if not id then
@@ -148,7 +171,8 @@ for _, t in pairs(UIMapAssignment) do
 	if uiMapID == 947 then
 		table.insert(W, t)
 	end
-	if ContinentUIMapIDs[uiMapID] and Order > 0 then
+	if ContinentUIMapIDs[uiMapID] and Order > 0 and t.AreaID == 0 then
+		print(uiMapID, t.MapID)
 		table.insert(C, t)
 	end
 end
@@ -165,7 +189,7 @@ end
 table.insert(S, "}")
 local str = table.concat(S)
 -- uncomment to print db2 map data
-print(str)
+-- print(str)
 
 local function MapIDSorter(a,b) return a.MapID < b.MapID end
 
