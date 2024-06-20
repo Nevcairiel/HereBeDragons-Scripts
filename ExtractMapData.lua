@@ -1,12 +1,14 @@
 
 local WOWDIR = "E:\\Games\\World of Warcraft"
-local CDN = "http://eu.patch.battle.net/wow/#eu"
-local PRODUCT = "wow_classic_beta" --  "wow", "wowt", "wow_classic"
+local CDN = "http://us.patch.battle.net:1119/wow_beta/#eu"
+local PRODUCT = "wow_beta" --  "wow", "wowt", "wow_classic"
+local LOCALDB2 = false
 
 local INFO = {
 	["UIMapAssignment.db2"] = {
 		table = "UIMapAssignment",
 		fileId = 1957219,
+		syntax = "4f6fuiiiiii",
 		fields = {
 			[1] = "id",
 			[2] = "UIMin0",
@@ -31,7 +33,7 @@ local INFO = {
 	["UIMap.db2"] = {
 		table = "UIMap",
 		fileId = 1957206,
-		syntax = "suuuuu.*",
+		--syntax = "suuuuu.*",
 		fields = {
 			[1] = "id",
 			[2] = "name",
@@ -55,6 +57,8 @@ local Continents = {
 	[1642] = 875, -- Zandalar
 	[1643] = 876, -- Kul Tiras
 	[2364] = 1550, -- Shadowlands
+	[2444] = 1978, -- Dragon Isles
+	[2552] = 2274, -- Khaz Algar
 }
 
 -- uiMapID -> MapID
@@ -69,8 +73,10 @@ local ContinentUIMapIDs = {
 	[875] = 1642, -- Zandalar
 	[876] = 1643, -- Kul Tiras
 	[1550] = 2364, -- Shadowlands
+	[1978] = 2444, -- Dragon Isles
+	[2274] = 2552, -- Khaz Algar
 	
-	-- Classic/BC
+	-- Classic/BC/Wrath
 	[1414] = 1, -- Kalimdor
 	[1415] = 0, -- EK
 	[1945] = 530, -- Outlands
@@ -79,6 +85,7 @@ local ContinentUIMapIDs = {
 local keys = {
 	["83a2ab72dd8ae992"] = "023cff062b19a529b9f14f9b7aaac5bb",
 	["17f07c2e3a45db3d"] = "6D3886BDB91E715AE7182D9F3A08F2C9",
+	-- ["a4541c671097d0bd"] = "0400000058465448FFFFFFFFFFFFFFFF",
 }
 
 local function printerr(pattern, ...)
@@ -106,18 +113,30 @@ end
 local handle
 if WOWDIR then
 	local err
-	handle, err = casc.open({base = WOWDIR .. "\\Data", locale = casc.locale.GB, verifyHashes = false, cdn = cdnFlag, bkey = buildKey, keys = keys})
+	handle, err = casc.open(WOWDIR, {locale = casc.locale.GB, verifyHashes = false, bkey = buildKey, keys = keys, zerofillEncryptedChunks = true})
 	if not handle then
 		printerr("Unable to open CASC, %s", err)
 		return
 	end
 else
 	local err
-	handle = casc.open(CDN, {locale = casc.locale.GB, verifyHashes = false})
+	handle, err = casc.open(CDN, {locale = casc.locale.GB, verifyHashes = false, keys = keys, zerofillEncryptedChunks = true})
 	if not handle then
 		printerr("Unable to open CASC, %s", err)
 		return
 	end
+end
+
+local function readFile(fileName, info)
+	if not LOCALDB2 then
+        return handle:readFile(info.fileId)
+    else
+        local f, err = io.open(fileName, "rb")
+        if not f then return nil, err end
+        local c = f:read("*all")
+        f:close()
+        return c
+    end
 end
 
 local function process_row(info, ...)
@@ -129,10 +148,10 @@ local function process_row(info, ...)
 	return id, entry
 end
 
-local function load_dbc(info)
+local function load_dbc(fileName, info)
 	local t = {}
 	_G[info.table] = t
-	local data, err = handle:readFile(info.fileId)
+	local data, err = readFile(fileName, info)
 	if not data then printerr(err) end
 	local iter, d, c = dbc.rows(data, info.syntax or "*?", true)
 	while true do
@@ -146,7 +165,7 @@ local function load_dbc(info)
 end
 
 for _file, info in pairs(INFO) do
-	local status, error = pcall(load_dbc, info)
+	local status, error = pcall(load_dbc, _file, info)
 	if not status then
 		printerr("LOAD ERROR: %s, %s", _file, error)
 	end
@@ -158,7 +177,7 @@ local C = {}
 for _, t in pairs(UIMapAssignment) do
 	local uiMapID = tonumber(t.uiMapID)
 	local Order = tonumber(t.OrderIndex)
-	if t.UIMin0 ~= 0 or t.UIMin1 ~= 0 or t.UIMax0 ~= 1 or t.UIMax1 ~= 1 then
+	if Order > 0 and (t.UIMin0 ~= 0 or t.UIMin1 ~= 0 or t.UIMax0 ~= 1 or t.UIMax1 ~= 1) then
 		--printerr("Skipping entry %d/%d", uiMapID, Order)
 	elseif T[uiMapID] then
 		if T[uiMapID][1] ~= t.MapID or T[uiMapID][2] ~= t.Region0 or T[uiMapID][3] ~= t.Region1 or T[uiMapID][4] ~= t.Region3 or T[uiMapID][5] ~= t.Region4 then
@@ -229,7 +248,7 @@ for _, k in pairs(C) do
 		local t2 = k.Region3 + h2 * k.UIMin1
 		local offsetX = T[k.uiMapID][5] - l2
 		local offsetY = T[k.uiMapID][4] - t2
-		if math.abs(offsetX) > 0.1 or math.abs(offsetY) > 0.1 then
+		if true or math.abs(offsetX) > 0.1 or math.abs(offsetY) > 0.1 then
 			--print(k.uiMapID,k.OrderIndex,k.MapID, T[k.uiMapID][1], offsetY, offsetX)
 			print(string.format("        { %d, %d, %s, %s, %s, %s, %s, %s },",
 			                     k.MapID, T[k.uiMapID][1], ppf(k.Region0, 2), ppf(k.Region3, 2), ppf(k.Region1, 2), ppf(k.Region4, 2), ppf(offsetY, 1), ppf(offsetX, 1)))
